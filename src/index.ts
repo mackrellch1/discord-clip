@@ -1,9 +1,10 @@
 require("dotenv").config();
 import { BaseGuildVoiceChannel, Client, Intents, VoiceChannel } from "discord.js";
-import { EndBehaviorType, getVoiceConnection, joinVoiceChannel, VoiceConnection } from "@discordjs/voice"
-import { createWriteStream } from "fs";
+import { AudioPlayerStatus, createAudioPlayer, createAudioResource, EndBehaviorType, entersState, getVoiceConnection, joinVoiceChannel, StreamType, VoiceConnection } from "@discordjs/voice"
+import { createWriteStream, createReadStream } from "fs";
 import { pipeline } from "node:stream";
 import { opus } from "prism-media";
+import * as ffmpeg from "fluent-ffmpeg";
 
 const client = new Client({
     intents: [
@@ -32,6 +33,8 @@ client.on("message", message => {
         message.channel.send("pong!")
     }
 })
+
+const player = createAudioPlayer();
 
 let globalConnection: VoiceConnection | null = null; // TODO: Change to map by guild IDs
 let currentChannelId: string | null = null;
@@ -65,7 +68,7 @@ client.on("voiceStateUpdate", async (oldMember, newMember) => {
                     guildId: channel.guildId,
                     adapterCreator: channel.guild.voiceAdapterCreator,
                     selfDeaf: false,
-                    selfMute: true
+                    selfMute: false
                 })
             );
         }
@@ -73,6 +76,7 @@ client.on("voiceStateUpdate", async (oldMember, newMember) => {
 });
 
 function connectionListener(connection: VoiceConnection) {
+    connection.subscribe(player);
     return connection.on("stateChange", (oldState, newState) => {
         if (newState.status === "disconnected") {
             globalConnection = null;
@@ -80,11 +84,22 @@ function connectionListener(connection: VoiceConnection) {
         }
         if (newState.status === "ready") {
             console.log(`Voice connection in ready state.`);
+            sendStaticAudio();
         }
     });
 }
 
+function sendStaticAudio() {
+    const readStream = createReadStream("./input/morse.mp3");
+    const resource = createAudioResource(readStream, {
+        inputType: StreamType.Arbitrary,
+    });
+    player.play(resource);
+    return entersState(player, AudioPlayerStatus.Playing, 5e3)
+}
+
 function handleNewSubscription(userId: string) {
+    console.log(`New voice subscription to user: ${userId}`);
     const writeStream = createWriteStream(`./recordings/${Date.now()}-${userId}.ogg`);
     const opusStream = globalConnection.receiver.subscribe(userId, {
         end: {
