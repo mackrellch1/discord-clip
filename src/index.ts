@@ -1,10 +1,9 @@
 require("dotenv").config();
-import { BaseGuildVoiceChannel, Client, Intents, VoiceChannel } from "discord.js";
+import { Client, Intents } from "discord.js";
 import { AudioPlayerStatus, createAudioPlayer, createAudioResource, EndBehaviorType, entersState, getVoiceConnection, joinVoiceChannel, StreamType, VoiceConnection } from "@discordjs/voice"
 import { createWriteStream, createReadStream } from "fs";
 import { pipeline } from "node:stream";
 import { opus } from "prism-media";
-import * as ffmpeg from "fluent-ffmpeg";
 
 const client = new Client({
     intents: [
@@ -97,39 +96,6 @@ function sendStaticAudio() {
     player.play(resource);
     return entersState(player, AudioPlayerStatus.Playing, 5e3)
 }
-
-// function handleNewSubscription(userId: string) {
-//     console.log(`New voice subscription to user: ${userId}`);
-//     const writeStream = createWriteStream(`./recordings/${Date.now()}-${userId}.mp3`);
-//     const opusStream = globalConnection.receiver.subscribe(userId, {
-//         end: {
-//             behavior: EndBehaviorType.AfterSilence,
-//             duration: 100,
-//         },
-//     });
-//     ffmpeg(opusStream)
-//         .format("mp3")
-//         .output(writeStream)
-//         .on("end", () => {
-//             console.log("yay")
-//         })
-//         .on("error", console.error)
-//         .run();
-//     // const oggStream = new opus.OggLogicalBitstream({
-//     //     opusHead: new opus.OpusHead({
-//     //         channelCount: 2,
-//     //         sampleRate: 48000,
-//     //     }),
-//     //     pageSizeControl: {
-//     //         maxPackets: 10,
-//     //     },
-//     // });
-//     // pipeline(opusStream, oggStream, writeStream, (error) => {
-//     //     if (error) {
-//     //         console.error(`Error recording file: ${error.message}`);
-//     //     }
-//     // });
-// }
 
 function handleNewSubscription(userId: string) {
     console.log(`New voice subscription to user: ${userId}`);
