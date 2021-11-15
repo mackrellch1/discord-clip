@@ -74,6 +74,9 @@ client.on("voiceStateUpdate", async (oldMember, newMember) => {
 
 function connectionListener(connection: VoiceConnection) {
     connection.subscribe(player);
+    connection.receiver.speaking.on("start", userId => {
+        handleNewSubscription(userId);
+    });
     return connection.on("stateChange", (oldState, newState) => {
         if (newState.status === "disconnected") {
             globalConnection = null;
@@ -82,9 +85,6 @@ function connectionListener(connection: VoiceConnection) {
         if (newState.status === "ready") {
             console.log(`Voice connection in ready state.`);
             sendStaticAudio();
-            connection.receiver.speaking.on("start", userId => {
-                handleNewSubscription(userId);
-            });
         }
     });
 }
@@ -97,6 +97,39 @@ function sendStaticAudio() {
     player.play(resource);
     return entersState(player, AudioPlayerStatus.Playing, 5e3)
 }
+
+// function handleNewSubscription(userId: string) {
+//     console.log(`New voice subscription to user: ${userId}`);
+//     const writeStream = createWriteStream(`./recordings/${Date.now()}-${userId}.mp3`);
+//     const opusStream = globalConnection.receiver.subscribe(userId, {
+//         end: {
+//             behavior: EndBehaviorType.AfterSilence,
+//             duration: 100,
+//         },
+//     });
+//     ffmpeg(opusStream)
+//         .format("mp3")
+//         .output(writeStream)
+//         .on("end", () => {
+//             console.log("yay")
+//         })
+//         .on("error", console.error)
+//         .run();
+//     // const oggStream = new opus.OggLogicalBitstream({
+//     //     opusHead: new opus.OpusHead({
+//     //         channelCount: 2,
+//     //         sampleRate: 48000,
+//     //     }),
+//     //     pageSizeControl: {
+//     //         maxPackets: 10,
+//     //     },
+//     // });
+//     // pipeline(opusStream, oggStream, writeStream, (error) => {
+//     //     if (error) {
+//     //         console.error(`Error recording file: ${error.message}`);
+//     //     }
+//     // });
+// }
 
 function handleNewSubscription(userId: string) {
     console.log(`New voice subscription to user: ${userId}`);
@@ -116,12 +149,9 @@ function handleNewSubscription(userId: string) {
             maxPackets: 10,
         },
     });
-    console.log(`Started recording for user ID: ${userId}`);
     pipeline(opusStream, oggStream, writeStream, (error) => {
         if (error) {
             console.error(`Error recording file: ${error.message}`);
-        } else {
-            console.log(`Successfully recorded file.`);
         }
     });
 }
