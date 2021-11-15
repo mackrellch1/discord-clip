@@ -1,0 +1,31 @@
+{
+  "name": "discord-clip",
+  "version": "1.0.0",
+  "description": "Clip Discord voice channels",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "ts-node src/index.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mackrellch1/discord-clip.git"
+  },
+  "author": "Colin Mackrell",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mackrellch1/discord-clip/issues"
+  },
+  "homepage": "https://github.com/mackrellch1/discord-clip#readme",
+  "dependencies": {
+    "@discordjs/opus": "^0.5.3",
+    "@discordjs/voice": "^0.7.5",
+    "discord.js": "^13.3.1",
+    "libsodium-wrappers": "^0.7.9",
+    "sodium": "^3.0.2"
+  },
+  "devDependencies": {
+    "eslint": "^8.2.0",
+    "prettier": "^2.4.1"
+  }
+}
