@@ -55,9 +55,6 @@ client.on("voiceStateUpdate", async (oldMember, newMember) => {
     }
     if (newMember) {
         // Joined channel
-        if (globalConnection) {
-            handleNewSubscription(newMember.id);
-        }
         const channel = newMember.channel;
         if (!globalConnection && channel) {
             console.log(`Connecting to voice channel: ${channel.name}`);
@@ -85,6 +82,9 @@ function connectionListener(connection: VoiceConnection) {
         if (newState.status === "ready") {
             console.log(`Voice connection in ready state.`);
             sendStaticAudio();
+            connection.receiver.speaking.on("start", userId => {
+                handleNewSubscription(userId);
+            });
         }
     });
 }
