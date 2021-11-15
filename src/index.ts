@@ -1,5 +1,9 @@
-import { Client, Intents, VoiceChannel } from "discord.js";
-import { joinVoiceChannel, VoiceConnection } from '@discordjs/voice'
+require("dotenv").config();
+import { BaseGuildVoiceChannel, Client, Intents, VoiceChannel } from "discord.js";
+import { EndBehaviorType, getVoiceConnection, joinVoiceChannel, VoiceConnection } from "@discordjs/voice"
+import { createWriteStream } from "fs";
+import { pipeline } from "node:stream";
+import { opus } from "prism-media";
 
 const client = new Client({
     intents: [
@@ -10,61 +14,101 @@ const client = new Client({
 });
 
 
-const prefix = '!'
+const prefix = "!"
 
-
-client.once('ready', () => {
-    console.log('Clipper is online!')
+client.once("ready", () => {
+    console.log("Clipper is online!")
 })
 
-client.on('message', message => {
-    if(!message.content.startsWith(prefix) || message.author.bot) {
+client.on("message", message => {
+    if (!message.content.startsWith(prefix) || message.author.bot) {
         return
     }
 
     const args = message.content.slice(prefix.length).split(/ +/)
     const command = args.shift().toLowerCase()
 
-    if (command === 'ping') {
-        message.channel.send('pong!')
+    if (command === "ping") {
+        message.channel.send("pong!")
     }
 })
 
+let globalConnection: VoiceConnection | null = null; // TODO: Change to map by guild IDs
+let currentChannelId: string | null = null;
+
 client.on("voiceStateUpdate", async (oldMember, newMember) => {
-    // const channel = guild.channels.cache.get('224997579891539968')
-    // console.log(channel)
-
-    // Assuming 'newMember' is the second parameter of the event.
-const voiceChannels = newMember.guild.channels.filter(c => c.type === 'voice');
-let count = 0;
-
-for (const [id, voiceChannel] of voiceChannels) count += voiceChannel.members.size;
-
-console.log(count);
-
-
-    // const channels = await guild.channels.fetch();
-    // const voiceChannels = channels.filter(c => c.type === "GUILD_VOICE") ;
-    // let channelMostUsers = null;
-    // let mostUserCount = 0;
-    // for (const channel of voiceChannels) {
-    //     console.log(channel)
-    //     if (channel.members.length > mostUserCount) {
-    //         mostUserCount = channel.members.length;
-    //         channelMostUsers = channel;
-    //     }
-    // }
-    // if (!channelMostUsers) {
-    //     return VoiceConnection.disconnect();
-    // } else {
-    //     const connection = joinVoiceChannel({
-    //         channelId: newMember.channelId,
-    //         guildId: newMember.guild.id,
-    //         adapterCreator: newMember.guild.voiceAdapterCreator,
-    //     });
-    // }
+    if (oldMember) {
+        // Left channel
+        const channel = oldMember.channel;
+        if (globalConnection && channel && currentChannelId === channel.id) {
+            const memberCount = channel.members.filter(u => u.user.bot !== true).size;
+            if (memberCount === 0) {
+                console.log("Disconnecting from voice channel.");
+                globalConnection.disconnect();
+                globalConnection = null;
+                currentChannelId = null;
+            }
+        }
+    }
+    if (newMember) {
+        // Joined channel
+        if (globalConnection) {
+            handleNewSubscription(newMember.id);
+        }
+        const channel = newMember.channel;
+        if (!globalConnection && channel) {
+            console.log(`Connecting to voice channel: ${channel.name}`);
+            currentChannelId = channel.id;
+            globalConnection = connectionListener(
+                joinVoiceChannel({
+                    channelId: channel.id,
+                    guildId: channel.guildId,
+                    adapterCreator: channel.guild.voiceAdapterCreator,
+                    selfDeaf: false,
+                    selfMute: true
+                })
+            );
+        }
+    }
 });
 
+function connectionListener(connection: VoiceConnection) {
+    return connection.on("stateChange", (oldState, newState) => {
+        if (newState.status === "disconnected") {
+            globalConnection = null;
+            currentChannelId = null;
+        }
+        if (newState.status === "ready") {
+            console.log(`Voice connection in ready state.`);
+        }
+    });
+}
 
+function handleNewSubscription(userId: string) {
+    const writeStream = createWriteStream(`./recordings/${Date.now()}-${userId}.ogg`);
+    const opusStream = globalConnection.receiver.subscribe(userId, {
+        end: {
+            behavior: EndBehaviorType.AfterSilence,
+            duration: 100,
+        },
+    });
+    const oggStream = new opus.OggLogicalBitstream({
+        opusHead: new opus.OpusHead({
+            channelCount: 2,
+            sampleRate: 48000,
+        }),
+        pageSizeControl: {
+            maxPackets: 10,
+        },
+    });
+    console.log(`Started recording for user ID: ${userId}`);
+    pipeline(opusStream, oggStream, writeStream, (error) => {
+        if (error) {
+            console.error(`Error recording file: ${error.message}`);
+        } else {
+            console.log(`Successfully recorded file.`);
+        }
+    });
+}
 
-client.login('OTA5NjI0MjE4OTc3NzAxOTA4.YZG_kQ.NMz9zvrSSByksI0z1lDUm5OTl4o')
+client.login(process.env.DISCORD_TOKEN);
