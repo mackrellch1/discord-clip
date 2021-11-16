@@ -35,19 +35,19 @@ client.on("message", message => {
 
 const player = createAudioPlayer();
 
-let globalConnection: VoiceConnection | null = null; // TODO: Change to map by guild IDs
+let globalConnections: Map <string, VoiceConnection> = new Map(); 
 let currentChannelId: string | null = null;
 
 client.on("voiceStateUpdate", async (oldMember, newMember) => {
     if (oldMember) {
         // Left channel
         const channel = oldMember.channel;
-        if (globalConnection && channel && currentChannelId === channel.id) {
+        if (globalConnections.get(oldMember.guild.id) && channel && currentChannelId === channel.id) {
             const memberCount = channel.members.filter(u => u.user.bot !== true).size;
             if (memberCount === 0) {
                 console.log("Disconnecting from voice channel.");
-                globalConnection.disconnect();
-                globalConnection = null;
+                globalConnections.get(oldMember.guild.id).disconnect();
+                globalConnections.delete(oldMember.guild.id);
                 currentChannelId = null;
             }
         }
@@ -55,35 +55,39 @@ client.on("voiceStateUpdate", async (oldMember, newMember) => {
     if (newMember) {
         // Joined channel
         const channel = newMember.channel;
-        if (!globalConnection && channel) {
+        if (!globalConnections.get(newMember.guild.id) && channel) {
             console.log(`Connecting to voice channel: ${channel.name}`);
             currentChannelId = channel.id;
-            globalConnection = connectionListener(
-                joinVoiceChannel({
-                    channelId: channel.id,
-                    guildId: channel.guildId,
-                    adapterCreator: channel.guild.voiceAdapterCreator,
-                    selfDeaf: false,
-                    selfMute: false
-                })
+            globalConnections.set(
+                newMember.guild.id, 
+                connectionListener(
+                    joinVoiceChannel({
+                        channelId: channel.id,
+                        guildId: channel.guildId,
+                        adapterCreator: channel.guild.voiceAdapterCreator,
+                        selfDeaf: false,
+                        selfMute: false
+                    }),
+                    newMember.guild.id
+                )
             );
         }
     }
 });
 
-function connectionListener(connection: VoiceConnection) {
+function connectionListener(connection: VoiceConnection, guildId: string) {
     connection.subscribe(player);
     connection.receiver.speaking.on("start", userId => {
         handleNewSubscription(userId);
     });
     return connection.on("stateChange", (oldState, newState) => {
         if (newState.status === "disconnected") {
-            globalConnection = null;
+            globalConnections.set(guildId, null);
             currentChannelId = null;
         }
         if (newState.status === "ready") {
             console.log(`Voice connection in ready state.`);
-            sendStaticAudio();
+            //sendStaticAudio();
         }
     });
 }
@@ -100,7 +104,7 @@ function sendStaticAudio() {
 function handleNewSubscription(userId: string) {
     console.log(`New voice subscription to user: ${userId}`);
     const writeStream = createWriteStream(`./recordings/${Date.now()}-${userId}.ogg`);
-    const opusStream = globalConnection.receiver.subscribe(userId, {
+    const opusStream = globalConnections.get().receiver.subscribe(userId, {
         end: {
             behavior: EndBehaviorType.AfterSilence,
             duration: 100,
