@@ -78,7 +78,7 @@ client.on("voiceStateUpdate", async (oldMember, newMember) => {
 function connectionListener(connection: VoiceConnection, guildId: string) {
     connection.subscribe(player);
     connection.receiver.speaking.on("start", userId => {
-        handleNewSubscription(userId);
+        handleNewSubscription(userId, guildId);
     });
     return connection.on("stateChange", (oldState, newState) => {
         if (newState.status === "disconnected") {
@@ -101,10 +101,10 @@ function sendStaticAudio() {
     return entersState(player, AudioPlayerStatus.Playing, 5e3)
 }
 
-function handleNewSubscription(userId: string) {
-    console.log(`New voice subscription to user: ${userId}`);
+function handleNewSubscription(userId: string, guildId: string) {
+    console.log(`New voice subscription to user: ${userId} in guild: ${guildId}`);
     const writeStream = createWriteStream(`./recordings/${Date.now()}-${userId}.ogg`);
-    const opusStream = globalConnections.get().receiver.subscribe(userId, {
+    const opusStream = globalConnections.get(guildId).receiver.subscribe(userId, {
         end: {
             behavior: EndBehaviorType.AfterSilence,
             duration: 100,
