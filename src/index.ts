@@ -5,11 +5,7 @@ import { createWriteStream, createReadStream } from "fs";
 import { pipeline } from "node:stream";
 import { opus } from "prism-media";
 import * as mongoose from 'mongoose';
-
-
-
-
-
+import { createGoogleUploadStream, makeGoogleFilePublic } from "./storage";
 
 mongoose.connect(process.env.MONGO_URI);
 
@@ -24,14 +20,6 @@ const recordingSchema = new mongoose.Schema({
 
 const RecordingModel = mongoose.model('Recording', recordingSchema);
 
-
-
-
-      
-
-
-
-
 const client = new Client({
     intents: [
         Intents.FLAGS.GUILDS,
@@ -39,7 +27,6 @@ const client = new Client({
         Intents.FLAGS.GUILD_VOICE_STATES,
     ]
 });
-
 
 const prefix = "!"
 
@@ -132,7 +119,7 @@ function sendStaticAudio() {
 function handleNewSubscription(userId: string, guildId: string, channelName: string) {
     console.log(`New voice subscription to user: ${userId} in guild: ${guildId}`);
     const fileId = new mongoose.Types.ObjectId();
-    const writeStream = createWriteStream(`./recordings/${fileId}.ogg`);
+    const writeStream = createGoogleUploadStream(fileId.toString());
     const opusStream = globalConnections.get(guildId).receiver.subscribe(userId, {
         end: {
             behavior: EndBehaviorType.AfterSilence,
@@ -148,18 +135,24 @@ function handleNewSubscription(userId: string, guildId: string, channelName: str
             maxPackets: 10,
         },
     });
-    pipeline(opusStream, oggStream, writeStream, (error) => {
+    pipeline(opusStream, oggStream, writeStream, async (error) => {
         if (error) {
             console.error(`Error recording file: ${error.message}`);
         } else {
             const recording = new RecordingModel({
                 _id: fileId,
-                userName: client.users.cache.get(userId),
+                userName: client.users.cache.get(userId).username,
                 userId: userId,
                 guildId: guildId,
                 date: new Date(),
                 channelName: channelName
             })
+            
+            await Promise.all([
+                recording.save(),
+                makeGoogleFilePublic(fileId.toString())
+            ])
+
         }
     });
 }
