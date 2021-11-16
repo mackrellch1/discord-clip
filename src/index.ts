@@ -4,6 +4,33 @@ import { AudioPlayerStatus, createAudioPlayer, createAudioResource, EndBehaviorT
 import { createWriteStream, createReadStream } from "fs";
 import { pipeline } from "node:stream";
 import { opus } from "prism-media";
+import * as mongoose from 'mongoose';
+
+
+
+
+
+
+mongoose.connect(process.env.MONGO_URI);
+
+const recordingSchema = new mongoose.Schema({
+    _id: mongoose.Schema.Types.ObjectId,
+    userName: String,
+    userId: String,
+    guildId: String,
+    time: Date,
+    channelName: String,
+});
+
+const RecordingModel = mongoose.model('Recording', recordingSchema);
+
+
+
+
+      
+
+
+
 
 const client = new Client({
     intents: [
@@ -56,7 +83,7 @@ client.on("voiceStateUpdate", async (oldMember, newMember) => {
         // Joined channel
         const channel = newMember.channel;
         if (!globalConnections.get(newMember.guild.id) && channel) {
-            console.log(`Connecting to voice channel: ${channel.name}`);
+            console.log(`Connecting to voice channel: ${channel.name} in ${newMember.guild}`);
             currentChannelId = channel.id;
             globalConnections.set(
                 newMember.guild.id, 
@@ -103,7 +130,8 @@ function sendStaticAudio() {
 
 function handleNewSubscription(userId: string, guildId: string) {
     console.log(`New voice subscription to user: ${userId} in guild: ${guildId}`);
-    const writeStream = createWriteStream(`./recordings/${Date.now()}-${userId}.ogg`);
+    const fileId = new mongoose.Types.ObjectId();
+    const writeStream = createWriteStream(`./recordings/${fileId}.ogg`);
     const opusStream = globalConnections.get(guildId).receiver.subscribe(userId, {
         end: {
             behavior: EndBehaviorType.AfterSilence,
@@ -122,6 +150,11 @@ function handleNewSubscription(userId: string, guildId: string) {
     pipeline(opusStream, oggStream, writeStream, (error) => {
         if (error) {
             console.error(`Error recording file: ${error.message}`);
+        } else {
+            const recording = new RecordingModel({
+                _id: fileId,
+                userName: 
+            })
         }
     });
 }
