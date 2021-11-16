@@ -1,5 +1,5 @@
 require("dotenv").config();
-import { Client, Intents } from "discord.js";
+import { Channel, Client, Intents } from "discord.js";
 import { AudioPlayerStatus, createAudioPlayer, createAudioResource, EndBehaviorType, entersState, getVoiceConnection, joinVoiceChannel, StreamType, VoiceConnection } from "@discordjs/voice"
 import { createWriteStream, createReadStream } from "fs";
 import { pipeline } from "node:stream";
@@ -18,7 +18,7 @@ const recordingSchema = new mongoose.Schema({
     userName: String,
     userId: String,
     guildId: String,
-    time: Date,
+    date: Date,
     channelName: String,
 });
 
@@ -95,17 +95,18 @@ client.on("voiceStateUpdate", async (oldMember, newMember) => {
                         selfDeaf: false,
                         selfMute: false
                     }),
-                    newMember.guild.id
+                    newMember.guild.id,
+                    channel.name
                 )
             );
         }
     }
 });
 
-function connectionListener(connection: VoiceConnection, guildId: string) {
+function connectionListener(connection: VoiceConnection, guildId: string, channelName: string) {
     connection.subscribe(player);
     connection.receiver.speaking.on("start", userId => {
-        handleNewSubscription(userId, guildId);
+        handleNewSubscription(userId, guildId, channelName);
     });
     return connection.on("stateChange", (oldState, newState) => {
         if (newState.status === "disconnected") {
@@ -128,7 +129,7 @@ function sendStaticAudio() {
     return entersState(player, AudioPlayerStatus.Playing, 5e3)
 }
 
-function handleNewSubscription(userId: string, guildId: string) {
+function handleNewSubscription(userId: string, guildId: string, channelName: string) {
     console.log(`New voice subscription to user: ${userId} in guild: ${guildId}`);
     const fileId = new mongoose.Types.ObjectId();
     const writeStream = createWriteStream(`./recordings/${fileId}.ogg`);
@@ -153,7 +154,11 @@ function handleNewSubscription(userId: string, guildId: string) {
         } else {
             const recording = new RecordingModel({
                 _id: fileId,
-                userName: 
+                userName: client.users.cache.get(userId),
+                userId: userId,
+                guildId: guildId,
+                date: new Date(),
+                channelName: channelName
             })
         }
     });
