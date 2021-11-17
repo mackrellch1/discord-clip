@@ -5,17 +5,14 @@ import { createWriteStream, createReadStream } from "fs";
 import { pipeline } from "node:stream";
 import { opus } from "prism-media";
 import * as mongoose from 'mongoose';
-import winston from 'winston'
+import { createLogger, format, transports } from 'winston'
 import { makeGoogleFilePublic, uploadFileToGCS, getPublicUrl } from "./storage";
 
 mongoose.connect(process.env.MONGO_URI);
 
 const logConfiguration = {
     transports: [
-        new winston.transports.Console({
-            level: 'warn'
-        }),
-        new winston.transports.File({
+        new transports.File({
             level: 'error',
             // Create the log directory if it does not exist
             filename: 'console.log'
@@ -23,7 +20,7 @@ const logConfiguration = {
     ]
 };
 
-const logger = winston.createLogger(logConfiguration);
+const logger = createLogger(logConfiguration);
 
 const recordingSchema = new mongoose.Schema({
     _id: mongoose.Schema.Types.ObjectId,
