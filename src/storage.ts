@@ -1,19 +1,7 @@
 import { Storage } from "@google-cloud/storage";
 import { join } from "path";
 import { unlink } from "fs"
-import { createLogger, format, transports } from 'winston'
-
-const logConfiguration = {
-    transports: [
-        new transports.File({
-            level: 'error',
-            // Create the log directory if it does not exist
-            filename: 'storage_error.log'
-        })
-    ]
-};
-
-const logger = createLogger(logConfiguration);
+import { logger } from "./logger"
 
 
 export const storage = new Storage({
