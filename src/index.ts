@@ -15,7 +15,7 @@ const logConfiguration = {
         new transports.File({
             level: 'error',
             // Create the log directory if it does not exist
-            filename: 'console.log'
+            filename: 'logger.info'
         })
     ]
 };
@@ -45,7 +45,7 @@ const client = new Client({
 const prefix = "!"
 
 client.once("ready", () => {
-    console.log("Clipper is online!")
+    logger.info("Clipper is online!")
 })
 
 client.on("message", message => {
