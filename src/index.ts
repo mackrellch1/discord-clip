@@ -1,12 +1,12 @@
 require("dotenv").config();
-import { Channel, Client, Intents } from "discord.js";
-import { AudioPlayerStatus, createAudioPlayer, createAudioResource, EndBehaviorType, entersState, getVoiceConnection, joinVoiceChannel, StreamType, VoiceConnection } from "@discordjs/voice"
+import {  Client, Intents } from "discord.js";
+import { AudioPlayerStatus, createAudioPlayer, createAudioResource, EndBehaviorType, entersState, StreamType, VoiceConnection, joinVoiceChannel } from "@discordjs/voice"
 import { createWriteStream, createReadStream } from "fs";
 import { pipeline } from "node:stream";
 import { opus } from "prism-media";
 import * as mongoose from 'mongoose';
 import winston from 'winston'
-import { createGoogleUploadStream, makeGoogleFilePublic, uploadFileToGCS } from "./storage";
+import { makeGoogleFilePublic, uploadFileToGCS, getPublicUrl } from "./storage";
 
 mongoose.connect(process.env.MONGO_URI);
 
@@ -109,10 +109,13 @@ client.on("voiceStateUpdate", async (oldMember, newMember) => {
 
 function connectionListener(connection: VoiceConnection, guildId: string, channelName: string) {
     connection.subscribe(player);
-    connection.receiver.speaking.on("start", userId => {
+    connection.receiver.speaking.on("start", async userId => {
         handleNewSubscription(userId, guildId, channelName);
     });
-    return connection.on("stateChange", (oldState, newState) => {
+    connection.receiver.speaking.on("end", async userId => {
+        sendRandomAudio();
+    });
+    return connection.on("stateChange", async (oldState, newState) => {
         if (newState.status === "disconnected") {
             globalConnections.set(guildId, null);
             currentChannelId = null;
@@ -124,19 +127,37 @@ function connectionListener(connection: VoiceConnection, guildId: string, channe
     });
 }
 
-function sendStaticAudio() {
-    const readStream = createReadStream("./input/morse.mp3");
-    const resource = createAudioResource(readStream, {
-        inputType: StreamType.Arbitrary,
-    });
-    player.play(resource);
-    return entersState(player, AudioPlayerStatus.Playing, 5e3)
+async function getRandomClip() {
+    const [ doc ] = await RecordingModel.aggregate([
+        { 
+            $match: {
+                clipDuration: { $lt: Number(process.env.MAX_RANDOM_DURATION || 1000) }
+            }
+        },
+        { 
+            $sample: { size: 1 } 
+        }
+    ]);
+    return getPublicUrl(process.env.GCP_BUCKET_NAME, doc._id);
+}
+
+function sendRandomAudio() {
+    const shouldPlay = Math.random() > Number(process.env.RANDOM_PLAY_CHANCE);
+    if (shouldPlay) {
+        setTimeout(async () => {
+            const clipUrl = await getRandomClip();
+            const resource = createAudioResource(`${clipUrl}.ogg`, {
+                inputType: StreamType.Arbitrary,
+            });
+            player.play(resource);
+            return entersState(player, AudioPlayerStatus.Playing, 5e3);
+        }, Math.random() * (1000 - 500 + 1) + 500);
+    }
 }
 
 function handleNewSubscription(userId: string, guildId: string, channelName: string) {
     logger.info(`New voice subscription to user: ${userId} in guild: ${guildId}`);
     const fileId = new mongoose.Types.ObjectId();
-    //const writeStream = createGoogleUploadStream(fileId.toString());
     const writeStream = createWriteStream(`${fileId.toString()}.ogg`)
     const opusStream = globalConnections.get(guildId).receiver.subscribe(userId, {
         end: {
@@ -172,7 +193,7 @@ function handleNewSubscription(userId: string, guildId: string, channelName: str
             
             await Promise.all([
                 recording.save(),
-                makeGoogleFilePublic(`${fileId.toString()}`)
+                makeGoogleFilePublic(`${fileId.toString()}`),
             ])
 
         }
