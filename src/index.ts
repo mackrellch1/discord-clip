@@ -16,6 +16,7 @@ const recordingSchema = new mongoose.Schema({
     guildId: String,
     date: Date,
     channelName: String,
+    clipDuration: Number
 });
 
 const RecordingModel = mongoose.model('Recording', recordingSchema);
@@ -135,6 +136,8 @@ function handleNewSubscription(userId: string, guildId: string, channelName: str
             maxPackets: 10,
         },
     });
+
+    const startTime = Date.now()
     pipeline(opusStream, oggStream, writeStream, async (error) => {
         if (error) {
             console.error(`Error recording file: ${error.message}`);
@@ -145,7 +148,8 @@ function handleNewSubscription(userId: string, guildId: string, channelName: str
                 userId: userId,
                 guildId: guildId,
                 date: new Date(),
-                channelName: channelName
+                channelName: channelName,
+                clipDuration: Date.now()-startTime
             })
             
             await Promise.all([
