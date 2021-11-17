@@ -5,7 +5,7 @@ import { createWriteStream, createReadStream } from "fs";
 import { pipeline } from "node:stream";
 import { opus } from "prism-media";
 import * as mongoose from 'mongoose';
-import { createGoogleUploadStream, makeGoogleFilePublic } from "./storage";
+import { createGoogleUploadStream, makeGoogleFilePublic, uploadFileToGCS } from "./storage";
 
 mongoose.connect(process.env.MONGO_URI);
 
@@ -143,6 +143,7 @@ function handleNewSubscription(userId: string, guildId: string, channelName: str
         if (error) {
             console.error(`Error recording file: ${error.message}`);
         } else {
+            await uploadFileToGCS(`${fileId.toString()}.ogg`);
             const recording = new RecordingModel({
                 _id: fileId,
                 userName: client.users.cache.get(userId).username,
@@ -155,7 +156,7 @@ function handleNewSubscription(userId: string, guildId: string, channelName: str
             
             await Promise.all([
                 recording.save(),
-                makeGoogleFilePublic(`${fileId.toString()}.ogg`)
+                makeGoogleFilePublic(`${fileId.toString()}`)
             ])
 
         }

@@ -1,5 +1,7 @@
 import { Storage } from "@google-cloud/storage";
 import { join } from "path";
+import { unlink } from "fs"
+
 
 export const storage = new Storage({
     projectId: process.env.GCP_PROJECT_ID,
@@ -34,14 +36,19 @@ export async function makeGoogleFilePublic(fileName: string) {
 }
 
 export function uploadFileToGCS(fileName: string) {
-    const gcs = new Storage({
-        projectId: 'Discord-Clips',
-        keyFilename: './service-account.json'
-    });
-    bucket.upload(`${fileName}.ogg`, function(err, file) {
-        if (err) console.error(err);
-        //TODO delete file
-    });
+    return new Promise<void>((resolve, reject) => {
+        bucket.upload(fileName, function(err, file) {
+            if (err) {
+                reject(err);
+            }
+            unlink(fileName, (err) => {
+                if (err) {
+                    reject(err);
+                }
+                resolve();
+            })
+        });
+    })
 }
 
 export const getPublicUrl = (bucketName: string, fileName: string) => `https://storage.googleapis.com/${bucketName}/${fileName}`;
