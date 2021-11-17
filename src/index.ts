@@ -5,9 +5,25 @@ import { createWriteStream, createReadStream } from "fs";
 import { pipeline } from "node:stream";
 import { opus } from "prism-media";
 import * as mongoose from 'mongoose';
+import winston from 'winston'
 import { createGoogleUploadStream, makeGoogleFilePublic, uploadFileToGCS } from "./storage";
 
 mongoose.connect(process.env.MONGO_URI);
+
+const logConfiguration = {
+    transports: [
+        new winston.transports.Console({
+            level: 'warn'
+        }),
+        new winston.transports.File({
+            level: 'error',
+            // Create the log directory if it does not exist
+            filename: 'console.log'
+        })
+    ]
+};
+
+const logger = winston.createLogger(logConfiguration);
 
 const recordingSchema = new mongoose.Schema({
     _id: mongoose.Schema.Types.ObjectId,
@@ -60,7 +76,7 @@ client.on("voiceStateUpdate", async (oldMember, newMember) => {
         if (globalConnections.get(oldMember.guild.id) && channel && currentChannelId === channel.id) {
             const memberCount = channel.members.filter(u => u.user.bot !== true).size;
             if (memberCount === 0) {
-                console.log("Disconnecting from voice channel.");
+                logger.info("Disconnecting from voice channel."); 
                 globalConnections.get(oldMember.guild.id).disconnect();
                 globalConnections.delete(oldMember.guild.id);
                 currentChannelId = null;
@@ -71,7 +87,7 @@ client.on("voiceStateUpdate", async (oldMember, newMember) => {
         // Joined channel
         const channel = newMember.channel;
         if (!globalConnections.get(newMember.guild.id) && channel) {
-            console.log(`Connecting to voice channel: ${channel.name} in ${newMember.guild}`);
+            logger.info(`Connecting to voice channel: ${channel.name} in ${newMember.guild}`);
             currentChannelId = channel.id;
             globalConnections.set(
                 newMember.guild.id, 
@@ -102,7 +118,7 @@ function connectionListener(connection: VoiceConnection, guildId: string, channe
             currentChannelId = null;
         }
         if (newState.status === "ready") {
-            console.log(`Voice connection in ready state.`);
+            logger.info(`Voice connection in ready state.`);
             //sendStaticAudio();
         }
     });
@@ -118,7 +134,7 @@ function sendStaticAudio() {
 }
 
 function handleNewSubscription(userId: string, guildId: string, channelName: string) {
-    console.log(`New voice subscription to user: ${userId} in guild: ${guildId}`);
+    logger.info(`New voice subscription to user: ${userId} in guild: ${guildId}`);
     const fileId = new mongoose.Types.ObjectId();
     //const writeStream = createGoogleUploadStream(fileId.toString());
     const writeStream = createWriteStream(`${fileId.toString()}.ogg`)
@@ -141,7 +157,7 @@ function handleNewSubscription(userId: string, guildId: string, channelName: str
     const startTime = Date.now()
     pipeline(opusStream, oggStream, writeStream, async (error) => {
         if (error) {
-            console.error(`Error recording file: ${error.message}`);
+            logger.error(`Error recording file: ${error.message}`);
         } else {
             await uploadFileToGCS(`${fileId.toString()}.ogg`);
             const recording = new RecordingModel({

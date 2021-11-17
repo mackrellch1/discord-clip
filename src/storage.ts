@@ -1,6 +1,22 @@
 import { Storage } from "@google-cloud/storage";
 import { join } from "path";
 import { unlink } from "fs"
+import winston from 'winston'
+
+const logConfiguration = {
+    transports: [
+        new winston.transports.Console({
+            level: 'warn'
+        }),
+        new winston.transports.File({
+            level: 'error',
+            // Create the log directory if it does not exist
+            filename: 'storage_error.log'
+        })
+    ]
+};
+
+const logger = winston.createLogger(logConfiguration);
 
 
 export const storage = new Storage({
@@ -23,7 +39,7 @@ export function createGoogleUploadStream(fileName: string) {
             },
         });
     } catch (error) {
-        console.error(error);
+        error(error);
     }
 }
 
@@ -31,7 +47,7 @@ export async function makeGoogleFilePublic(fileName: string) {
     try {
         return await bucket.file(`${fileName}.ogg`).makePublic();
     } catch (error) {
-        console.error(error);
+        logger.error(error);
     }
 }
 
