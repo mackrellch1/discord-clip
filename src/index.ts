@@ -120,7 +120,8 @@ function sendStaticAudio() {
 function handleNewSubscription(userId: string, guildId: string, channelName: string) {
     console.log(`New voice subscription to user: ${userId} in guild: ${guildId}`);
     const fileId = new mongoose.Types.ObjectId();
-    const writeStream = createGoogleUploadStream(fileId.toString());
+    //const writeStream = createGoogleUploadStream(fileId.toString());
+    const writeStream = createWriteStream(`${fileId.toString()}.ogg`)
     const opusStream = globalConnections.get(guildId).receiver.subscribe(userId, {
         end: {
             behavior: EndBehaviorType.AfterSilence,
@@ -154,7 +155,7 @@ function handleNewSubscription(userId: string, guildId: string, channelName: str
             
             await Promise.all([
                 recording.save(),
-                makeGoogleFilePublic(fileId.toString())
+                makeGoogleFilePublic(`${fileId.toString()}.ogg`)
             ])
 
         }
