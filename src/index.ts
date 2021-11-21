@@ -174,7 +174,8 @@ function handleNewSubscription(userId: string, guildId: string, channelName: str
                 guildId: guildId,
                 date: new Date(),
                 channelName: channelName,
-                clipDuration: Date.now()-startTime
+                clipDuration: Date.now()-startTime,
+                likes: 0
             })
             
             await Promise.all([
