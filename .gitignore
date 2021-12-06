@@ -1,3 +1,5 @@
+*.ogg
+
 .DS_Store
 service-account.json
 
